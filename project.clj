@@ -5,7 +5,10 @@
             :url "http://opensource.org/licenses/MIT"}
   :scm {:name "git"
         :url "http://github.com/dm3/clojure.java-time"}
-  :dependencies [[clj-tuple "0.2.2"]]
+  :dependencies [[clj-tuple "0.2.2"]
+                 [cljsjs/js-joda "1.6.2-0"]
+                 [org.clojure/clojurescript "1.9.946"]]
+  :source-paths ["src" "cljs"]
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.8.0"]
                                   [criterium "0.4.4"]
                                   [com.taoensso/timbre "4.1.4"]

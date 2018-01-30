@@ -1,7 +1,16 @@
 (ns java-time.core
   (:refer-clojure :exclude (zero? range max min))
-  (:import [java.time.temporal ValueRange]
-           [java.time.chrono Chronology]))
+  #?(:clj
+     (:import [java.time.temporal ValueRange]
+       [java.time.chrono Chronology])
+     :cljs (:require [cljsjs.js-joda])
+     ))
+
+#?( :cljs (def ValueRange (.. js/JSJoda -ValueRange)))
+#?( :cljs (def Chronology (.. js/JSJoda -IsoChronology)))
+#?( :cljs (def Number js/Number))
+
+
 
 (defprotocol Amount
   (zero? [a]
