@@ -5,56 +5,57 @@
             [java-time.properties :as jt.p]
             [java-time.format :as jt.f]
             [java-time.clock :as jt.clock]
-            [java-time.defconversion :refer (deffactory conversion!)])
-  (:import [java.time.temporal Temporal TemporalAccessor ValueRange
-            TemporalField TemporalUnit TemporalAmount ChronoField IsoFields]
-           [java.time.format DateTimeFormatter]
-           [java.time.chrono Chronology]
-           [java.time DateTimeException Clock
-            Period Duration MonthDay DayOfWeek Month Year
-            ZoneOffset Instant]))
+    [java-time.temporal-macros :as jt.tm :include-macros true]
+            #?(:clj
+            [java-time.defconversion :refer (deffactory conversion!)]))
+  #?(:clj
+     (:import [java.time.temporal Temporal TemporalAccessor ValueRange
+                                  TemporalField TemporalUnit TemporalAmount ChronoField IsoFields]
+              [java.time.format DateTimeFormatter]
+              [java.time.chrono Chronology]
+              [java.time DateTimeException Clock
+                         Period Duration MonthDay DayOfWeek Month Year
+                         ZoneOffset Instant])))
 
-(def writable-range-property-fns
-  {:with-min-value (fn [p] (jt.c/with-value p (jt.c/min-value p)))
-   :with-largest-min-value (fn [p] (jt.c/with-value p (jt.c/largest-min-value p)))
-   :with-smallest-max-value (fn [p] (jt.c/with-value p (jt.c/smallest-max-value p)))
-   :with-max-value (fn [p] (jt.c/with-value p (jt.c/max-value p)))})
 
-(defmacro value-property [java-type range-field &
-                          {:keys [with-value-fn-sym get-value-fn-sym]
-                           :or {with-value-fn-sym 'of
-                                get-value-fn-sym 'getValue}}]
-  (let [java-type-arg (with-meta (gensym) {:tag java-type})]
-    `(do
-       (extend-type ~java-type
-         jt.c/ReadableProperty
-         (value [d#]
-           (. d# ~get-value-fn-sym))
+#?(:cljs
+   (do
+     (def Temporal (.. js/JSJoda -Temporal))
+     (def TemporalAccessor (.. js/JSJoda -TemporalAccessor))
+     (def ValueRange (.. js/JSJoda -ValueRange))
+     (def TemporalField (.. js/JSJoda -TemporalField))
+     (def TemporalUnit (.. js/JSJoda -TemporalUnit))
+     (def TemporalAmount (.. js/JSJoda -TemporalAmount))
+     (def ChronoField (.. js/JSJoda -ChronoField))
+     (def IsoFields (.. js/JSJoda -IsoFields))
+     (def DateTimeFormatter (.. js/JSJoda -DateTimeFormatter))
+     ;(def Chronology (.. js/JSJoda -Chronology))
+     (def DateTimeException (.. js/JSJoda -DateTimeException))
+     (def Clock (.. js/JSJoda -Clock))
+     (def Period (.. js/JSJoda -Period))
+     (def Duration (.. js/JSJoda -Duration))
+     (def MonthDay (.. js/JSJoda -MonthDay))
+     (def DayOfWeek (.. js/JSJoda -DayOfWeek))
+     (def Month (.. js/JSJoda -Month))
+     (def Year (.. js/JSJoda -Year))
+     (def ZoneOffset (.. js/JSJoda -ZoneOffset))
+     (def Instant (.. js/JSJoda -Instant))
+     
+     (def ResolverStyle (.. js/JSJoda -ResolverStyle))))
 
-         jt.c/WritableProperty
-         (with-value [_# v#]
-           (. ~java-type ~with-value-fn-sym v#)))
 
-       (extend ~java-type
-         jt.c/ReadableRangeProperty
-         (assoc jt.c/readable-range-property-fns
-                :range (fn [~java-type-arg]
-                         (.range ~java-type-arg ~range-field)))
+(jt.tm/value-property DayOfWeek (jt.u/static-prop ChronoField 'DAY_OF_WEEK))
+(jt.tm/value-property Month (jt.u/static-prop ChronoField 'MONTH_OF_YEAR))
+(jt.tm/value-property Year (jt.u/static-prop ChronoField 'YEAR_OF_ERA))
+(jt.tm/value-property ZoneOffset (jt.u/static-prop ChronoField 'OFFSET_SECONDS)
+  :with-value-fn-sym ofTotalSeconds
+  :get-value-fn-sym getTotalSeconds)
 
-         jt.c/WritableRangeProperty
-         writable-range-property-fns))))
-
-(value-property DayOfWeek ChronoField/DAY_OF_WEEK)
-(value-property Month ChronoField/MONTH_OF_YEAR)
-(value-property Year ChronoField/YEAR_OF_ERA)
-(value-property ZoneOffset ChronoField/OFFSET_SECONDS
-                :with-value-fn-sym ofTotalSeconds
-                :get-value-fn-sym getTotalSeconds)
-
-(jt.u/when-threeten-extra
-  (import [org.threeten.extra AmPm DayOfMonth DayOfYear Quarter YearQuarter])
-  (value-property DayOfMonth ChronoField/DAY_OF_MONTH)
-  (value-property DayOfYear ChronoField/DAY_OF_YEAR))
+#?(:clj
+   (jt.u/when-threeten-extra
+     (import [org.threeten.extra AmPm DayOfMonth DayOfYear Quarter YearQuarter])
+     (jt.tm/value-property DayOfMonth ChronoField/DAY_OF_MONTH)
+     (jt.tm/value-property DayOfYear ChronoField/DAY_OF_YEAR)))
 
 ;;;;; FIELD PROPERTY
 
@@ -113,26 +114,6 @@
 (alter-meta! #'->TemporalFieldProperty assoc :private true)
 (alter-meta! #'map->TemporalFieldProperty assoc :private true)
 
-(defmacro field-property [java-type has-range?]
-  (let [java-type-arg (with-meta (gensym) {:tag java-type})]
-    `(do
-       (extend ~java-type
-         jt.c/ReadableProperty
-         {:value (fn [~java-type-arg]
-                   (get-long-property-value (.o ~java-type-arg)
-                                            (.field ~java-type-arg)))})
-
-       ~(when has-range?
-          `(extend ~java-type
-             jt.c/ReadableRangeProperty
-             (assoc jt.c/readable-range-property-fns
-                    :range (fn [~java-type-arg]
-                             (get-field-property-range (.o ~java-type-arg)
-                                                       (.field ~java-type-arg))))
-
-             jt.c/WritableRangeProperty
-             writable-range-property-fns)))))
-
 (field-property DayOfWeekFieldProperty true)
 (field-property MonthFieldProperty true)
 (field-property MonthDayFieldProperty true)
@@ -176,9 +157,9 @@
              res (transient {})]
         (if f
           (recur (first r) (rest r)
-                 (if (jt.c/supports? o f)
-                   (assoc! res k f)
-                   res))
+            (if (jt.c/supports? o f)
+              (assoc! res k f)
+              res))
           (persistent! res)))))
 
   jt.c/HasProperties
@@ -273,7 +254,7 @@
       (loop [u u, us us, res (transient {})]
         (if u
           (recur (first us) (rest us)
-                 (assoc! res (jt.p/unit-key u) u))
+            (assoc! res (jt.p/unit-key u) u))
           (persistent! res)))))
 
   jt.c/HasProperties
