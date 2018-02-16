@@ -1,9 +1,19 @@
 (ns java-time.properties
   (:require [java-time.core :as jt.c]
             [java-time.util :as jt.u])
-  (:import [java.time.temporal
-            TemporalField IsoFields ChronoField JulianFields
-            TemporalUnit ChronoUnit]))
+  #?(:clj (:import [java.time.temporal
+               TemporalField IsoFields ChronoField JulianFields
+               TemporalUnit ChronoUnit])))
+
+#?(:cljs
+   (do
+     (def TemporalField (.. js/JSJoda -TemporalField))
+     (def IsoFields (.. js/JSJoda -IsoFields))
+     (def ChronoField (.. js/JSJoda -ChronoField))
+     (def TemporalUnit (.. js/JSJoda -TemporalUnit))
+     (def ChronoUnit (.. js/JSJoda -ChronoUnit))
+     ;(def JulianFields (.. js/JSJoda -JulianFields))
+     ))
 
 (defn- property->key [p]
   (keyword (jt.u/dashize (str p))))
@@ -31,10 +41,14 @@
 ;;;;;;;;; UNIT
 
 (def iso-units
-  (vals (jt.u/get-static-fields-of-type IsoFields TemporalUnit)))
+  (vals
+    #?(:clj (jt.u/get-static-fields-of-type IsoFields TemporalUnit)
+       :cljs (jt.u/get-fields-matching IsoFields #".*YEARS")))) ;todo
 
 (def chrono-units
-  (vals (jt.u/get-static-fields-of-type ChronoUnit TemporalUnit)))
+  (vals
+    #?(:clj (jt.u/get-static-fields-of-type ChronoUnit TemporalUnit)
+       :cljs (jt.u/get-fields-matching ChronoUnit #".*"))))
 
 (def predefined-units
   (concat iso-units chrono-units))
@@ -68,7 +82,8 @@
 (defn ^TemporalUnit get-unit-checked [o]
   (if-let [u (get-unit o)]
     u
-    (throw (NullPointerException. (str "No temporal unit found for " o "!")))))
+    (throw (#?(:clj NullPointerException.
+               :cljs js/Error.) (str "No temporal unit found for " o "!")))))
 
 (defn unit-key [o]
   (cond (keyword? o)
@@ -80,13 +95,19 @@
 ;;;;;;;;; FIELD
 
 (def iso-fields
-  (vals (jt.u/get-static-fields-of-type IsoFields TemporalField)))
+  (vals
+    #?(:clj (jt.u/get-static-fields-of-type IsoFields TemporalField)
+       :cljs (jt.u/get-fields-matching IsoFields #".*"))))
 
 (def julian-fields
-  (vals (jt.u/get-static-fields-of-type JulianFields TemporalField)))
+  (vals
+    #?(:clj (jt.u/get-static-fields-of-type JulianFields TemporalField)
+       :cljs {})))
 
 (def chrono-fields
-  (vals (jt.u/get-static-fields-of-type ChronoField TemporalField)))
+  (vals
+    #?(:clj (jt.u/get-static-fields-of-type ChronoField TemporalField)
+       :cljs (jt.u/get-fields-matching ChronoField #".*"))))
 
 (def predefined-fields
   (concat iso-fields chrono-fields julian-fields))
@@ -106,10 +127,18 @@
   (supports? [f t]
     (.isSupportedBy f ^TemporalAccessor t)))
 
-(extend TemporalField
+(extend-type TemporalField
   jt.c/ReadableRangeProperty
-  (assoc jt.c/readable-range-property-fns
-         :range (fn [^TemporalField f] (.range f))))
+  (range [^TemporalField k]
+     (.range k))
+  (min-value [p]
+    ((jt.c/readable-range-property-fns :min-value) p))
+  (largest-min-value [p]
+    ((jt.c/readable-range-property-fns :largest-min-value) p))
+  (smallest-max-value [p]
+    ((jt.c/readable-range-property-fns :smallest-max-value) p))
+  (max-value [p]
+    ((jt.c/readable-range-property-fns :max-value) p)))
 
 (defn field?
   "True if this is a `TemporalField`."
@@ -160,7 +189,15 @@
   (supports? [k t]
     (jt.c/supports? (or (get-field k) (get-unit k)) t)))
 
-(extend clojure.lang.Keyword
+(extend-type clojure.lang.Keyword
   jt.c/ReadableRangeProperty
-  (assoc jt.c/readable-range-property-fns
-         :range (fn [k] (jt.c/range (get-field k)))))
+  (range [k]
+     (jt.c/range (get-field k)))
+  (min-value [p]
+    ((jt.c/readable-range-property-fns :min-value) p))
+  (largest-min-value [p]
+    ((jt.c/readable-range-property-fns :largest-min-value) p))
+  (smallest-max-value [p]
+    ((jt.c/readable-range-property-fns :smallest-max-value) p))
+  (max-value [p]
+    ((jt.c/readable-range-property-fns :max-value) p)))

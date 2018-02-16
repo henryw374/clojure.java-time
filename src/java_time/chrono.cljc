@@ -1,7 +1,16 @@
 (ns java-time.chrono
   (:require [java-time.core :as jt.c])
-  (:import [java.time.chrono ChronoPeriod ChronoLocalDate ChronoLocalDateTime ChronoZonedDateTime]
-           [java.time.temporal TemporalAmount]))
+  #?(:clj (:import [java.time.chrono ChronoPeriod ChronoLocalDate ChronoLocalDateTime ChronoZonedDateTime]
+       [java.time.temporal TemporalAmount])))
+
+
+#?(:cljs
+     (do
+       (def ChronoPeriod (.. js/JSJoda -Period))
+       (def ChronoLocalDate (.. js/JSJoda -ChronoLocalDate))
+       (def ChronoLocalDateTime (.. js/JSJoda -ChronoLocalDateTime))
+       (def ChronoZonedDateTime (.. js/JSJoda -ChronoZonedDateTime))
+       )) 
 
 (defn- ^ChronoPeriod cp-plus [^ChronoPeriod cp, ^TemporalAmount o]
   (.plus cp o))
